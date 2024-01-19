@@ -2,6 +2,14 @@
 
 This contract is for staking.
 
+## Address
+
+The staking address is below
+
+### testnet
+
+> 0x6939C07410401D883f00c51720A13A827dE66E01
+
 ## Using
 
 ### install dependencies
