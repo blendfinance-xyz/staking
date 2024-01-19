@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { IBlast } from "../interfaces/IBlast.sol";
 
 contract Staking is Ownable {
   struct Registrar {
@@ -26,6 +27,8 @@ contract Staking is Ownable {
   constructor(address token_) Ownable(msg.sender) {
     _token = token_;
     _tokenContract = IERC20(token_);
+    // remark this line before test, because blast is not available on local
+    IBlast(0x4300000000000000000000000000000000000002).configureClaimableGas();
   }
 
   event Stake(address indexed account, uint256 lockupTime, uint256 amount);
@@ -210,6 +213,13 @@ contract Staking is Ownable {
     _tokenContract.transfer(msg.sender, member.balance);
     delete _members[msg.sender][lockupTime_];
     emit Abort(msg.sender, lockupTime_, member.balance);
+  }
+
+  function claimAllGas() external onlyOwner {
+    IBlast(0x4300000000000000000000000000000000000002).claimAllGas(
+      address(this),
+      msg.sender
+    );
   }
 
   function _safeAdd(uint256 a, uint256 b) internal pure returns (uint256) {
