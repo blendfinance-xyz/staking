@@ -51,7 +51,7 @@ contract Staking is Ownable {
 
   function _findRegistrar(
     uint256 lockupTime_
-  ) private view returns (Registrar storage) {
+  ) internal view returns (Registrar storage) {
     return _registrars[lockupTime_];
   }
 
@@ -69,7 +69,7 @@ contract Staking is Ownable {
   function setRegistrar(
     uint256 lockupTime_,
     uint256 rewardRate_
-  ) public onlyOwner {
+  ) external onlyOwner {
     require(lockupTime_ > 0, "Staking: lock time must be greater than 0");
     Registrar storage registrar = _findRegistrar(lockupTime_);
     registrar.rewardRate = rewardRate_;
@@ -78,7 +78,7 @@ contract Staking is Ownable {
   function _findMember(
     address account_,
     uint256 lockupTime_
-  ) private view returns (Member storage) {
+  ) internal view returns (Member storage) {
     return _members[account_][lockupTime_];
   }
 
@@ -105,7 +105,7 @@ contract Staking is Ownable {
   /**
    * @dev Stakes a given amount for a given lockup time.
    */
-  function stake(uint256 lockupTime_, uint256 amount_) public {
+  function stake(uint256 lockupTime_, uint256 amount_) external {
     require(amount_ > 0, "Staking: amount must be greater than 0");
     require(
       _tokenContract.balanceOf(msg.sender) >= amount_,
@@ -148,7 +148,7 @@ contract Staking is Ownable {
   /**
    * @dev Unstakes all amount and reward from a given lockup time.
    */
-  function unstake(uint256 lockupTime_) public {
+  function unstake(uint256 lockupTime_) external {
     Registrar memory registrar = _findRegistrar(lockupTime_);
     require(
       registrar.rewardRate > 0,
@@ -199,7 +199,7 @@ contract Staking is Ownable {
   /**
    * @dev Aborts a stake and returns the amount to the account.
    */
-  function abort(uint256 lockupTime_) public {
+  function abort(uint256 lockupTime_) external {
     Registrar memory registrar = _findRegistrar(lockupTime_);
     require(
       registrar.rewardRate > 0,
