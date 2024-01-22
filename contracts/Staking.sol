@@ -20,13 +20,11 @@ contract Staking is Ownable {
   mapping(address => mapping(uint256 lockupTime => Member)) private _members;
 
   address private _token;
-  IERC20 private _tokenContract;
   uint256 REWARD_RATE_DIVIDER = 10 ** 6;
   uint256 YEAR = 365 days;
 
   constructor(address token_) Ownable(msg.sender) {
     _token = token_;
-    _tokenContract = IERC20(token_);
     // remark this line before test, because blast is not available on local
     IBlast(0x4300000000000000000000000000000000000002).configureClaimableGas();
   }
@@ -107,12 +105,13 @@ contract Staking is Ownable {
    */
   function stake(uint256 lockupTime_, uint256 amount_) external {
     require(amount_ > 0, "Staking: amount must be greater than 0");
+    IERC20 tc = IERC20(_token);
     require(
-      _tokenContract.balanceOf(msg.sender) >= amount_,
+      tc.balanceOf(msg.sender) >= amount_,
       "Staking: insufficient balance"
     );
     require(
-      _tokenContract.allowance(msg.sender, address(this)) >= amount_,
+      tc.allowance(msg.sender, address(this)) >= amount_,
       "Staking: insufficient allowance"
     );
 
@@ -122,7 +121,7 @@ contract Staking is Ownable {
       "Staking: account already has a stake for this lockup time"
     );
 
-    _tokenContract.transferFrom(msg.sender, address(this), amount_);
+    tc.transferFrom(msg.sender, address(this), amount_);
 
     member.stakeTimestamp = block.timestamp;
     member.balance = amount_;
@@ -169,7 +168,7 @@ contract Staking is Ownable {
       lockupTime_
     );
 
-    _tokenContract.transfer(msg.sender, _safeAdd(member.balance, reward));
+    IERC20(_token).transfer(msg.sender, _safeAdd(member.balance, reward));
 
     delete _members[msg.sender][lockupTime_];
 
@@ -210,7 +209,7 @@ contract Staking is Ownable {
       member.balance > 0,
       "Staking: account does not have a stake for this lockup time"
     );
-    _tokenContract.transfer(msg.sender, member.balance);
+    IERC20(_token).transfer(msg.sender, member.balance);
     delete _members[msg.sender][lockupTime_];
     emit Abort(msg.sender, lockupTime_, member.balance);
   }
