@@ -74,7 +74,7 @@ describe("deploy test", () => {
 describe("token test", () => {
   test("should claim right", async () => {
     const { otherAccount, token } = await loadFixture(deploy);
-    const claimAmount = await token.getClaimAmount();
+    const claimAmount = await token.claimAmount();
     const otherTokenBalance = await token.balanceOf(otherAccount.address);
     await token.connect(otherAccount).claim();
     const otherTokenBalanceAfterClaim = await token.balanceOf(
