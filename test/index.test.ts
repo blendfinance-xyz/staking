@@ -115,7 +115,7 @@ describe("business test", () => {
       lockupDays,
       BigInt(rewardRate * REWARD_RATE_DIVIDER),
     );
-    const rr = await staking.getRewardRate(lockupDays);
+    const rr = await staking.rewardRate(lockupDays);
     strictEqual(
       rr.toString(),
       BigInt(rewardRate * REWARD_RATE_DIVIDER).toString(),

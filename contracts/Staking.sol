@@ -7,17 +7,13 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { IBlast } from "../interfaces/IBlast.sol";
 
 contract Staking is Ownable {
-  struct Registrar {
-    uint256 rewardRate;
-  }
-
   struct Member {
     uint256 stakeTimestamp;
     uint256 balance;
   }
 
-  mapping(uint256 lockupTime => Registrar) private _registrars;
-  mapping(address => mapping(uint256 lockupTime => Member)) private _members;
+  mapping(uint256 => uint256) private _rewardRates;
+  mapping(address => mapping(uint256 => Member)) private _members;
 
   address private _token;
   uint256 REWARD_RATE_DIVIDER = 10 ** 6;
@@ -26,7 +22,7 @@ contract Staking is Ownable {
   constructor(address token_) Ownable(msg.sender) {
     _token = token_;
     // remark this line before test, because blast is not available on local
-    IBlast(0x4300000000000000000000000000000000000002).configureClaimableGas();
+    // IBlast(0x4300000000000000000000000000000000000002).configureClaimableGas();
   }
 
   event Stake(address indexed account, uint256 lockupTime, uint256 amount);
@@ -47,18 +43,11 @@ contract Staking is Ownable {
     return _token;
   }
 
-  function _findRegistrar(
-    uint256 lockupTime_
-  ) internal view returns (Registrar storage) {
-    return _registrars[lockupTime_];
-  }
-
   /**
    * @dev Gets the reward rate for a given lockup time.
    */
-  function getRewardRate(uint256 lockupTime_) public view returns (uint256) {
-    Registrar memory r = _findRegistrar(lockupTime_);
-    return r.rewardRate;
+  function rewardRate(uint256 lockupTime_) public view returns (uint256) {
+    return _rewardRates[lockupTime_];
   }
 
   /**
@@ -69,8 +58,7 @@ contract Staking is Ownable {
     uint256 rewardRate_
   ) external onlyOwner {
     require(lockupTime_ > 0, "Staking: lock time must be greater than 0");
-    Registrar storage registrar = _findRegistrar(lockupTime_);
-    registrar.rewardRate = rewardRate_;
+    _rewardRates[lockupTime_] = rewardRate_;
   }
 
   function _findMember(
@@ -148,11 +136,7 @@ contract Staking is Ownable {
    * @dev Unstakes all amount and reward from a given lockup time.
    */
   function unstake(uint256 lockupTime_) external {
-    Registrar memory registrar = _findRegistrar(lockupTime_);
-    require(
-      registrar.rewardRate > 0,
-      "Staking: reward rate must be greater than 0"
-    );
+    require(rewardRate(lockupTime_) > 0, "Staking: reward rate must be greater than 0");
     Member storage member = _findMember(msg.sender, lockupTime_);
     require(
       member.balance > 0,
@@ -162,11 +146,7 @@ contract Staking is Ownable {
       block.timestamp - member.stakeTimestamp >= lockupTime_,
       "Staking: lockup time has not been reached"
     );
-    uint256 reward = _calculateReward(
-      member.balance,
-      registrar.rewardRate,
-      lockupTime_
-    );
+    uint256 reward = _calculateReward(member.balance, rewardRate(lockupTime_), lockupTime_);
 
     IERC20(_token).transfer(msg.sender, _safeAdd(member.balance, reward));
 
@@ -182,28 +162,19 @@ contract Staking is Ownable {
     address account,
     uint256 lockupTime_
   ) public view returns (uint256) {
-    Registrar memory registrar = _findRegistrar(lockupTime_);
-    require(
-      registrar.rewardRate > 0,
-      "Staking: reward rate must be greater than 0"
-    );
+    require(rewardRate(lockupTime_) > 0, "Staking: reward rate must be greater than 0");
     Member memory member = _findMember(account, lockupTime_);
     require(
       member.balance > 0,
       "Staking: account does not have a stake for this lockup time"
     );
-    return _calculateReward(member.balance, registrar.rewardRate, lockupTime_);
+    return _calculateReward(member.balance, rewardRate(lockupTime_), lockupTime_);
   }
 
   /**
    * @dev Aborts a stake and returns the amount to the account.
    */
   function abort(uint256 lockupTime_) external {
-    Registrar memory registrar = _findRegistrar(lockupTime_);
-    require(
-      registrar.rewardRate > 0,
-      "Staking: reward rate must be greater than 0"
-    );
     Member storage member = _findMember(msg.sender, lockupTime_);
     require(
       member.balance > 0,
