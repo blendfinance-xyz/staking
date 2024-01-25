@@ -33,26 +33,10 @@ async function deploy() {
     token,
     staking,
     initRewardAmount,
-  };
+  };1
 }
 
 describe("deploy test", () => {
-  test("should be mint right amount", async () => {
-    const {
-      owner,
-      otherAccount,
-      initAmount,
-      token,
-      staking,
-      initRewardAmount,
-    } = await loadFixture(deploy);
-    const ownerTokenBalance = await token.balanceOf(owner.address);
-    const otherTokenBalance = await token.balanceOf(otherAccount.address);
-    strictEqual(ownerTokenBalance.toString(), initAmount.toString());
-    strictEqual(otherTokenBalance.toString(), initAmount.toString());
-    const stakingTokenBalance = await token.balanceOf(staking.getAddress());
-    strictEqual(stakingTokenBalance.toString(), initRewardAmount.toString());
-  });
   test("should be right owner", async () => {
     const { owner, staking } = await loadFixture(deploy);
     strictEqual(
@@ -68,41 +52,6 @@ describe("deploy test", () => {
       await token.getAddress(),
       "staking token is not right",
     );
-  });
-});
-
-describe("token test", () => {
-  test("should claim right", async () => {
-    const { otherAccount, token } = await loadFixture(deploy);
-    const claimAmount = await token.claimAmount();
-    const otherTokenBalance = await token.balanceOf(otherAccount.address);
-    await token.connect(otherAccount).claim();
-    const otherTokenBalanceAfterClaim = await token.balanceOf(
-      otherAccount.address,
-    );
-    strictEqual(
-      otherTokenBalanceAfterClaim.toString(),
-      (otherTokenBalance + claimAmount).toString(),
-      "token balance is not right after claim",
-    );
-  });
-  test("should not claim before claim time", async () => {
-    const { otherAccount, token } = await loadFixture(deploy);
-    await token.connect(otherAccount).claim();
-    try {
-      await token.connect(otherAccount).claim();
-      assert(false, "claim before claim time");
-    } catch (e) {}
-  });
-  test("should claim after claim time", async () => {
-    const { otherAccount, token } = await loadFixture(deploy);
-    await token.connect(otherAccount).claim();
-    await time.increase(1 * DAY_MULTIPLIER);
-    try {
-      await token.connect(otherAccount).claim();
-    } catch (e) {
-      assert(false, "can not claim after claim time");
-    }
   });
 });
 

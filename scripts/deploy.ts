@@ -2,12 +2,10 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  // deploy token
-  const token = await ethers.deployContract("Token", ["Joey", "JOEY"]);
-  await token.waitForDeployment();
-  console.log("Token deployed to", token.target);
   // deploy staking
-  const staking = await ethers.deployContract("Staking", [token.target]);
+  const staking = await ethers.deployContract("Staking", [
+    "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729",
+  ]);
   await staking.waitForDeployment();
   console.log("Staking deployed to", staking.target);
 }
