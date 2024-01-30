@@ -4,7 +4,7 @@ import { ethers } from "hardhat";
 async function main() {
   // deploy staking
   const staking = await ethers.deployContract("Staking", [
-    "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729",
+    "0xA37E268923652749Ba41DD0bBF6227C276047463",
   ]);
   await staking.waitForDeployment();
   console.log("Staking deployed to", staking.target);

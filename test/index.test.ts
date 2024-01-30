@@ -33,7 +33,8 @@ async function deploy() {
     token,
     staking,
     initRewardAmount,
-  };1
+  };
+  1;
 }
 
 describe("deploy test", () => {
@@ -96,7 +97,7 @@ describe("business test", () => {
       otherAccount.address,
       lockupDays,
     );
-    assert(leftTime > 0, "left time is not right");
+    strictEqual(leftTime, lockupDays, "left time is not right");
   });
   test("should be right reward", async () => {
     const { otherAccount, token, staking } = await loadFixture(deploy);
