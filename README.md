@@ -8,7 +8,7 @@ The staking address is below
 
 ### testnet
 
-> 0x6d57f21D880e5059445D38899c7653071732cd0D
+> 0xD406B0edDDABF1e3fb09fF3588D70836A18d0ef2
 
 ## Using
 

@@ -31,7 +31,7 @@ contract Staking is Ownable {
   constructor(address token_) Ownable(msg.sender) {
     _token = IERC20(token_);
     // remark this line before test, because blast is not available on local
-    // IBlast(0x4300000000000000000000000000000000000002).configureClaimableGas();
+    IBlast(0x4300000000000000000000000000000000000002).configureClaimableGas();
   }
 
   /**
