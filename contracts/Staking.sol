@@ -14,39 +14,49 @@ contract Staking is Ownable {
 
   mapping(uint256 => uint256) private _rewardRates;
   mapping(address => mapping(uint256 => Member)) private _members;
+  mapping(address => uint256) private _stakes;
+  uint256 private _totalStaked;
 
-  address private _token;
-  uint256 REWARD_RATE_DIVIDER = 10 ** 6;
-  uint256 YEAR = 365 days;
-
-  constructor(address token_) Ownable(msg.sender) {
-    _token = token_;
-    // remark this line before test, because blast is not available on local
-    IBlast(0x4300000000000000000000000000000000000002).configureClaimableGas();
-  }
+  IERC20 private _token;
 
   event Stake(address indexed account, uint256 lockupTime, uint256 amount);
-
   event Unstaking(
     address indexed account,
     uint256 lockupTime,
     uint256 amount,
     uint256 reward
   );
-
   event Abort(address indexed account, uint256 lockupTime, uint256 amount);
+
+  constructor(address token_) Ownable(msg.sender) {
+    _token = IERC20(token_);
+    // remark this line before test, because blast is not available on local
+    // IBlast(0x4300000000000000000000000000000000000002).configureClaimableGas();
+  }
+
+  /**
+   * @dev Throws if called with a lockup time that is not available.
+   * @param lockupTime_ which lockup time class
+   */
+  modifier checkRewardRate(uint256 lockupTime_) {
+    require(
+      _rewardRates[lockupTime_] > 0,
+      "Staking: this lockup time is not available"
+    );
+    _;
+  }
 
   /**
    * @dev Gets the token address.
    * @return token
    */
   function token() public view returns (address) {
-    return _token;
+    return address(_token);
   }
 
   /**
    * @dev Gets the reward rate for a given lockup time.
-   * @param lockupTime_ which lockup time calss
+   * @param lockupTime_ which lockup time class
    * @return reward rate
    */
   function rewardRate(uint256 lockupTime_) public view returns (uint256) {
@@ -55,15 +65,19 @@ contract Staking is Ownable {
 
   /**
    * @dev Sets the reward rate for a given lockup time.
-   * @param lockupTime_ which lockup time calss
+   * @param lockupTime_ which lockup time class
    * @param rewardRate_ reward rate
    */
-  function setRegistrar(
+  function setRewardRate(
     uint256 lockupTime_,
     uint256 rewardRate_
   ) external onlyOwner {
     require(lockupTime_ > 0, "Staking: lock time must be greater than 0");
-    _rewardRates[lockupTime_] = rewardRate_;
+    if (rewardRate_ == 0) {
+      delete _rewardRates[lockupTime_];
+    } else {
+      _rewardRates[lockupTime_] = rewardRate_;
+    }
   }
 
   function _findMember(
@@ -74,12 +88,21 @@ contract Staking is Ownable {
   }
 
   /**
-   * @dev Gets the staked balance for a given lockup time and account.
+   * @dev Gets the staked balance for a given account.
    * @param account_ account who staked token
-   * @param lockupTime_ which lockup time calss
    * @return how much token staked
    */
-  function balanceOf(
+  function balanceOf(address account_) public view returns (uint256) {
+    return _stakes[account_];
+  }
+
+  /**
+   * @dev Gets the staked balance for a given lockup time and account.
+   * @param account_ account who staked token
+   * @param lockupTime_ which lockup time class
+   * @return how much token staked
+   */
+  function balanceOfOne(
     address account_,
     uint256 lockupTime_
   ) public view returns (uint256) {
@@ -88,9 +111,16 @@ contract Staking is Ownable {
   }
 
   /**
+   * @dev Gets the total staked balance.
+   */
+  function totalStaked() public view returns (uint256) {
+    return _totalStaked;
+  }
+
+  /**
    * @dev Gets the left lockup time
    * @param account_ account who staked token
-   * @param lockupTime_ which lockup time calss
+   * @param lockupTime_ which lockup time class
    * @return left time, in second
    */
   function leftLockupTime(
@@ -102,36 +132,32 @@ contract Staking is Ownable {
     return _safeSub(lockupTime_, timeElapsed);
   }
 
+  function _stake(uint256 amount_) internal {
+    _stakes[msg.sender] = _safeAdd(_stakes[msg.sender], amount_);
+    _totalStaked = _safeAdd(_totalStaked, amount_);
+    _token.transferFrom(msg.sender, address(this), amount_);
+  }
+
   /**
    * @dev Stakes a given amount for a given lockup time.
-   * @param lockupTime_ which lockup time calss
+   * @param lockupTime_ which lockup time class
    * @param amount_ amount of token to stake
    */
-  function stake(uint256 lockupTime_, uint256 amount_) external {
+  function stake(
+    uint256 lockupTime_,
+    uint256 amount_
+  ) external checkRewardRate(lockupTime_) {
     require(amount_ > 0, "Staking: amount must be greater than 0");
-    IERC20 tc = IERC20(_token);
-    require(
-      tc.balanceOf(msg.sender) >= amount_,
-      "Staking: insufficient balance"
-    );
-    require(
-      tc.allowance(msg.sender, address(this)) >= amount_,
-      "Staking: insufficient allowance"
-    );
-
+    // member
     Member storage member = _findMember(msg.sender, lockupTime_);
     require(
       member.balance == 0,
       "Staking: account already has a stake for this lockup time"
     );
-
-    tc.transferFrom(msg.sender, address(this), amount_);
-
+    _stake(amount_);
     member.stakeTimestamp = block.timestamp;
     member.balance = amount_;
-
     _members[msg.sender][lockupTime_] = member;
-
     emit Stake(msg.sender, lockupTime_, amount_);
   }
 
@@ -139,24 +165,27 @@ contract Staking is Ownable {
     uint256 amount,
     uint256 rewardRate_,
     uint256 timeElapsed
-  ) internal view returns (uint256) {
+  ) internal pure returns (uint256) {
     return
       Math.mulDiv(
         amount,
         _safeMul(rewardRate_, timeElapsed),
-        _safeMul(YEAR, REWARD_RATE_DIVIDER)
+        _safeMul(365 days, 10 ** 6)
       );
+  }
+
+  function _unstake(uint256 amount, uint256 reward) internal {
+    _stakes[msg.sender] = _safeSub(_stakes[msg.sender], amount);
+    _totalStaked = _safeSub(_totalStaked, amount);
+    _token.transfer(msg.sender, _safeAdd(amount, reward));
   }
 
   /**
    * @dev Unstakes all amount and reward from a given lockup time.
-   * @param lockupTime_ which lockup time calss
+   * @param lockupTime_ which lockup time class
    */
-  function unstake(uint256 lockupTime_) external {
-    require(
-      rewardRate(lockupTime_) > 0,
-      "Staking: reward rate must be greater than 0"
-    );
+  function unstake(uint256 lockupTime_) external checkRewardRate(lockupTime_) {
+    // member
     Member storage member = _findMember(msg.sender, lockupTime_);
     require(
       member.balance > 0,
@@ -171,9 +200,7 @@ contract Staking is Ownable {
       rewardRate(lockupTime_),
       lockupTime_
     );
-
-    IERC20(_token).transfer(msg.sender, _safeAdd(member.balance, reward));
-
+    _unstake(member.balance, reward);
     delete _members[msg.sender][lockupTime_];
 
     emit Unstaking(msg.sender, lockupTime_, member.balance, reward);
@@ -182,17 +209,13 @@ contract Staking is Ownable {
   /**
    * @dev Gets the reward value for a given lockup time and account.
    * @param account_ account who staked token
-   * @param lockupTime_ which lockup time calss
+   * @param lockupTime_ which lockup time class
    * @return how much reward will get
    */
   function getReward(
     address account_,
     uint256 lockupTime_
-  ) public view returns (uint256) {
-    require(
-      rewardRate(lockupTime_) > 0,
-      "Staking: reward rate must be greater than 0"
-    );
+  ) public view checkRewardRate(lockupTime_) returns (uint256) {
     Member memory member = _findMember(account_, lockupTime_);
     require(
       member.balance > 0,
@@ -204,15 +227,16 @@ contract Staking is Ownable {
 
   /**
    * @dev Aborts a stake and returns the amount to the account.
-   * @param lockupTime_ which lockup time calss
+   * @param lockupTime_ which lockup time class
    */
   function abort(uint256 lockupTime_) external {
+    // member
     Member storage member = _findMember(msg.sender, lockupTime_);
     require(
       member.balance > 0,
       "Staking: account does not have a stake for this lockup time"
     );
-    IERC20(_token).transfer(msg.sender, member.balance);
+    _unstake(member.balance, 0);
     delete _members[msg.sender][lockupTime_];
     emit Abort(msg.sender, lockupTime_, member.balance);
   }
